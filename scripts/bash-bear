@@ -1,0 +1,318 @@
+#!/bin/bash
+
+# NOTE: taken from:
+#       https://savannah.nongnu.org/projects/bash-bear-trap/
+
+#
+# Bash Bear Trap: error handling with stack traces.
+#
+# Copyright (C) 2023 Free Software Foundation <sysadmin@fsf.org>
+#
+# Note: the FSF recommends copyleft licensing for programs > 300 lines, see
+# https://www.gnu.org/licenses/license-recommendations.en.html.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+####### DOCUMENTATION ########
+#
+#
+# Usage: First, source the file. Best to handle the case of it not
+# existing like so:
+#
+# set -e; . /usr/local/lib/bash-bear; set +e
+#
+# Then, when an error happens, it prints a stack trace and bash
+# variables and exits.
+#
+# It is also good for your .bashrc: in an interactive shell, it returns from
+# functions instead of exiting.
+#
+# If err-cleanup is a command, it runs that before the stack
+# trace. Functions are documented inline below for additional use cases.
+#
+#
+#
+#  Version: 1.0
+#
+# Changelog: None
+#
+# Bash versions tested on:
+#
+# * 4.4.20(1)-release (x86_64-pc-linux-gnu)
+# * 5.0.17(1)-release (x86_64-pc-linux-gnu)
+# * 5.1.16(1)-release (x86_64-pc-linux-gnu).
+
+
+# TODO: investigate to see if we can format output betting in case of
+# subshell failure. Right now, we get independent trace from inside and
+# outside of the subshell. Note, errexit + inherit_errexit doesn't have
+# any smarts around this either.
+
+if ! test "$BASH_VERSION"; then echo "error: shell is not bash" >&2; exit 1; fi
+
+#######################################
+# err-catch: Setup trap on ERR to print stack trace and exit (or return
+# if the shell is interactive). This is the most common use case so we
+# run it after defining it, you can call err-allow to undo that.
+#
+# This also sets pipefail because it's a good practice to catch more
+# errors.
+#
+# Note: In interactive shell, stack calling line number is not
+# available, so we print function definition lines.
+#
+# Note: This works like set -e, which has one unintuitive feature: If
+# you use a function as part of a conditional, eg: func && come_cmd, a
+# failed command within func won't trigger an error.
+#
+# Globals
+#
+#  err_catch_ignore  Array containing glob patterns to test against
+#                    filenames to ignore errors from in interactive
+#                    shell. Initialized to ignore bash-completion
+#                    scripts on debian based systems.
+#
+#  err-cleanup       If set, this command will run just before exiting.
+#                    This does nothing in an interactive shell, I'm not
+#                    sure if I could make it work there.
+#
+#  _err_func_last    Used internally in err-bash-trace-interactive
+#
+#######################################
+err-catch() {
+  set -E;
+  if [[ $- == *i* ]]; then
+    if ! test ${err_catch_ignore+defined}; then
+      err_catch_ignore=(
+        '/etc/bash_completion.d/*'
+        '*/bash-completion/*'
+      )
+    fi
+    declare -i _err_func_last=0
+    if [[ $- != *c* ]]; then
+      shopt -s extdebug
+    fi
+    # shellcheck disable=SC2154
+    trap '_err-bash-trace-interactive $? "${PIPESTATUS[*]}" "$BASH_COMMAND" ${BASH_ARGC[0]} "${BASH_ARGV[@]}" || return $?' ERR
+  else
+    # Man bash on exdebug: "If set at shell invocation, arrange to
+    # execute the debugger". We want to avoid that, but I want this file
+    # to be sourceable from bash startup files. noninteractive ssh and
+    # sources .bashrc on invocation. login_shell sources things on
+    # invocation.
+    #
+    # extdebug allows us to print function arguments in our stack trace.
+    if ! shopt login_shell >/dev/null && [[ ! $SSH_CONNECTION ]]; then
+      shopt -s extdebug
+    fi
+    trap err-exit ERR
+  fi
+  set -o pipefail
+}
+# This is the most common use case so run it now.
+err-catch
+
+#######################################
+# Undo err-catch/err-catch-interactive
+#######################################
+err-allow() {
+  shopt -u extdebug
+  set +E +o pipefail
+  trap ERR
+}
+
+#######################################
+# err-exit: Print stack trace and exit
+#
+# Use this instead of the exit command to be more informative.
+#
+# usage: err-exit [-EXIT_CODE] [MESSAGE]
+#
+# EXIT_CODE  Default: $? if it is nonzero, otherwise 1.
+# MESSAGE    Print MESSAGE to stderr. Default:
+#            ${BASH_SOURCE[1]}:${BASH_LINENO[0]}: `$BASH_COMMAND' returned $?
+#
+# Globals
+#
+#   err-cleanup   If set, this command will run just before exiting.
+#
+#######################################
+err-exit() {
+  # vars have _ prefix so that we can inspect existing set vars without
+  # too much overwriting of them.
+  local _err=$? _pipestatus="${PIPESTATUS[*]}"
+
+  # This has to come before most things or vars get changed
+  local _msg="${BASH_SOURCE[1]}:${BASH_LINENO[0]}: \`$BASH_COMMAND' returned $_err"
+  local _cmdr="$BASH_COMMAND" # command right. we chop of the left, keep the right.
+
+  if [[ $_pipestatus && $_pipestatus != "$_err" ]]; then
+    _msg+=", PIPESTATUS: $_pipestatus"
+  fi
+  set +x
+  if [[ $1 == -* ]]; then
+    _err=${1#-}
+    shift
+  elif (( ! _err )); then
+    _err=1
+  fi
+  if [[ $1 ]]; then
+    _msg="$1"
+  fi
+
+  ## Begin printing vars from within BASH_COMMAND ##
+  local _var _chars _l
+  local -A _vars
+  while [[ $_cmdr ]]; do
+    _chars="${#_cmdr}"
+    _cmdr="${_cmdr#*$}"
+    _cmdr="${_cmdr#{}"
+    if (( _chars == ${#_cmdr} )); then
+      break
+    fi
+    _var="${_cmdr%%[^a-zA-Z0-9_]*}"
+    if [[ ! $_var || $_var == [0-9]* ]]; then
+      continue
+    fi
+    _vars[${_var}]=t
+  done
+  #echo "iank ${_vars[*]}"
+  #set |& grep ^password
+  # in my small test, this took 50% longer than piping to grep.
+  # That seems a small enough penalty to stay in bash here.
+  if (( ${#_vars[@]} )); then
+    set |& while read -r _l; do
+             for _var in "${!_vars[@]}"; do
+               case $_l in
+                 ${_var}=*) printf "%s\n" "$_l" >&2 ;;
+               esac
+             done
+           done
+  fi
+  ## End printing vars from within BASH_COMMAND ##
+
+  printf "%s\n" "$_msg" >&2
+  err-bash-trace 2
+  set -e # err trap does not work within an error trap
+  if type -t err-cleanup >/dev/null; then
+    err-cleanup
+  fi
+  printf "%s: exiting with status %s\n" "$0" "$_err" >&2
+  exit $_err
+}
+
+#######################################
+# Print stack trace
+#
+# usage: err-bash-trace [FRAME_START]
+#
+# This function is called by the other functions which print stack
+# traces.
+#
+# It does not show function args unless you first run:
+# shopt -s extdebug
+# which err-catch does for you.
+#
+# FRAME_START  Optional variable to set before calling. The frame to
+#              start printing on. default=1. If ${#FUNCNAME[@]} <=
+#              FRAME_START + 1, don't print anything because we are at
+#              the top level of the script and better off printing a
+#              general message, for example see what our callers print.
+#
+#######################################
+err-bash-trace() {
+  local -i argc_index=0 frame i frame_start=${1:-1}
+  local source_loc
+  if (( ${#FUNCNAME[@]} <= frame_start + 1 )); then
+    return 0
+  fi
+  for ((frame=0; frame < ${#FUNCNAME[@]}; frame++)); do
+    argc=${BASH_ARGC[frame]}
+    argc_index+=$argc
+    if ((frame < frame_start)); then continue; fi
+    if (( ${#BASH_SOURCE[@]} > 1 )); then
+      source_loc="${BASH_SOURCE[frame]}:${BASH_LINENO[frame-1]}:"
+    fi
+    printf "  from %sin \`%s" "$source_loc" "${FUNCNAME[frame]}" >&2
+    if shopt extdebug >/dev/null; then
+      for ((i=argc_index-1; i >= argc_index-argc; i--)); do
+        printf " %s" "${BASH_ARGV[i]}" >&2
+      done
+    fi
+    echo \' >&2
+  done
+  return 0
+}
+
+#######################################
+# Internal function for err-catch. Prints stack trace from interactive
+# shell trap.
+#
+# Usage: see err-catch-interactive
+#######################################
+_err-bash-trace-interactive() {
+  if (( ${#FUNCNAME[@]} <= 1 )); then
+    return 0
+  fi
+
+  for pattern in "${err_catch_ignore[@]}"; do
+    # shellcheck disable=SC2053
+    if [[ ${BASH_SOURCE[1]} == $pattern ]]; then
+      return 0
+    fi
+  done
+
+  local ret bash_command argc pattern i last
+  last=$_err_func_last
+  _err_func_last=${#FUNCNAME[@]}
+  # We have these passed to us because they are lost inside the
+  # function.
+  ret=$1
+  pipestatus="$2"
+  bash_command="$3"
+  argc=$(( $4 - 1 ))
+  shift 4
+  argv=("$@")
+  # The trap returns a nonzero, then gets called again. This condition
+  # tells us if is that has happened by checking if we've gone down a
+  # stack level.
+  if (( _err_func_last >= last  )); then
+    printf "ERR: \`%s\' returned %s" "$bash_command" $ret >&2
+    if [[ $pipestatus != "$ret" ]]; then
+      printf ", PIPESTATUS: %s" "$pipestatus" >&2
+    fi
+    echo >&2
+  fi
+  printf "  from \`%s" "${FUNCNAME[1]}" >&2
+  if shopt extdebug >/dev/null; then
+    for ((i=argc; i >= 0; i--)); do
+      printf " %s" "${argv[i]}" >&2
+    done
+  fi
+  printf "\' defined at %s:%s\n" "${BASH_SOURCE[1]}" "$(declare -F "${FUNCNAME[1]}"|awk "{print \$2}")" >&2
+  if [[ -t 1 ]]; then
+    return $ret
+  else
+    # Part of an outgoing pipe, avoid getting get us stuck in a weird
+    # subshell if we returned nonzero, which would happen in a situation
+    # like this:
+    #
+    # tf() { while read -r line; do :; done < <(asdf); };
+    # tf
+    #
+    # Note: exit $ret also avoids the stuck subshell problem, and I
+    # can't notice any difference, but this seems more proper.
+    return 0
+  fi
+}

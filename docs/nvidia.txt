@@ -1,0 +1,16 @@
+	NVIDIA, FUCK YOU !
+		- Linus
+
+read the friendly manual, brah
+	https://wiki.archlinux.org/title/NVIDIA
+	https://wiki.archlinux.org/title/Vulkan
+	https://wiki.archlinux.org/title/Variable_refresh_rate
+
+checks if vulkan is available
+	$ vulkaninfo
+
+In order to force vsync:
+	$ sudo nvidia-settings
+	X Server Display Configuration > Advanced...
+	Force Full Composition Pipeline + Allow G-SYNC...
+	Apply + Save X Configuration file

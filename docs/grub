@@ -1,0 +1,40 @@
+#
+#   /etc/default/grub
+#
+#   sudo nvim /etc/default/grub
+#   sudo grub-mkconfig -o /boot/grub/grub.cfg
+#
+#   Configuration file for GRUB boot loader
+#
+#   https://wiki.archlinux.org/title/GRUB
+#
+
+# keep the last chosen option as the default one and use it
+GRUB_DEFAULT=saved
+GRUB_SAVEDEFAULT=true
+
+# show every option in main list, instead of hiding them in submenus
+GRUB_DISABLE_SUBMENU=y
+
+# For NVidia gpu running with proprietary drivers:
+GRUB_CMDLINE_LINUX="nvidia_drm.modeset=1 rd.driver.blacklist=nouveau modprobe.blacklist=nouveau"
+# For comparison, proper noveau setup requires this:
+GRUB_CMDLINE_LINUX="nouveau.config=NvGspRm=1"
+
+# disables grub menu, skips image selection entirerly
+# WARN: ofc you cannot dual-boot with this...
+GRUB_TIMEOUT="0"
+
+# silecing linux boot
+GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+
+# Very basic look, nothing fancy
+GRUB_TIMEOUT_STYLE="menu"
+GRUB_TERMINAL_INPUT="console"
+GRUB_TERMINAL_OUTPUT="console"
+export GRUB_COLOR_NORMAL="white/black"
+export GRUB_COLOR_HIGHLIGHT="yellow/dark-gray"
+
+# "SAM POPSUŁEM TO SAM NAPRAWIĘ"
+GRUB_DISABLE_RECOVERY="true"
+

@@ -1,0 +1,17 @@
+awesomewm	~/.config/awesome
+nvim	~/.config/nvim
+misc/wezterm	~/.config/wezterm
+misc/pcmanfm	~/.config/pcmanfm
+misc/.gitconfig	~/.gitconfig
+misc/.editorconfig	~/.editorconfig
+misc/htop	~/.config/htop
+DE/gtk-3.0	~/.config/gtk-3.0
+DE/.gtkrc-2.0	~/.gtkrc-2.0
+xorg/.Xresources	~/.Xresources
+xorg/.xprofile	~/.xprofile
+xorg/.xinitrc	~/.xinitrc
+misc/lxterminal	~/.config/lxterminal
+desktop/lxterminal.desktop	~/.local/share/applications/lxterminal.desktop
+shell/.bashrc	~/.bashrc
+shell/.blerc	~/.blerc
+shell/.bash_profile	~/.bash_profile

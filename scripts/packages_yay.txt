@@ -1,0 +1,13 @@
+yay
+bluetuith
+awesome-git
+lain-git
+htop-vim
+tcc-git
+gruvbox-dark-gtk
+gruvbox-dark-icons-gtk
+qt5gtk2
+xcursor-simp1e-gruvbox-dark
+xlayoutdisplay
+blesh-git
+paccache-hook

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=lxterminal
+GenericName=lxterminal
+Comment=Use the command line
+TryExec=lxterminal
+Exec=env TERM_PROGRAM=LXTerminal lxterminal %u
+Icon=lxterminal
+Type=Application
+Categories=GTK;System;TerminalEmulator;
+Keywords=console;command line;execute;

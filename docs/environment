@@ -1,0 +1,14 @@
+#
+#   /etc/environment
+#
+#   This file is parsed by pam_env module,
+#   it's handy to set up some enviroment variables here.
+#
+
+# for example:
+EDITOR=nvim
+
+# explicitly chosing Vulkan driver:
+VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nvidia_icd.json
+VK_DRIVER_FILES=/usr/share/vulkan/icd.d/nouveau_icd.x86_64.json
+
