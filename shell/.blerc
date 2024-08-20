@@ -1,0 +1,42 @@
+
+bleopt complete_auto_delay=
+bleopt complete_ambiguous=
+bleopt edit_bell=
+bleopt indent_tabs=1
+bleopt indent_offset=8
+bleopt editor=nvim
+bleopt history_share=1
+bleopt keymap_vi_mode_show:=
+bleopt complete_auto_complete=
+
+# https://github.com/akinomyoga/ble.sh/issues/57
+function ble/prompt/backslash:my/vim-mode {
+	bleopt keymap_vi_mode_update_prompt:=1
+	case $_ble_decode_keymap in
+	(vi_nmap) ble/prompt/print 'N' ;;
+	(vi_omap) ble/prompt/print '_' ;;
+	(vi_imap) ble/prompt/print '$' ;;
+	(vi_smap) ble/prompt/print 'S' ;;
+	(vi_xmap) ble/prompt/print 'V' ;;
+	esac
+}
+
+function _git_curr()
+{
+	gb=$(git branch 2> /dev/null)
+	if [[ "$gb" != "" ]]; then
+		gb="${gb#?}"
+		gb="${gb#?}"
+		echo "($gb) "
+	fi
+}
+
+PS1='\w $(_git_curr)\q{my/vim-mode} '
+
+
+ble-face auto_complete='fg=gray'
+
+ble-bind -m auto_complete -f C-y auto_complete/insert
+
+bind 'set completion-ignore-case on'
+

@@ -1,0 +1,17 @@
+
+xrdb ~/.Xresources
+xsetroot -cursor_name left_ptr
+setxkbmap pl
+xset b off
+xset m 0 0
+xlayoutdisplay
+[[ "$(which pulseaudio)" != "" ]] && pulseaudio --start
+
+export QT_QPA_PLATFORMTHEME="qt5gtk2"
+# HACK: cheat QT a bit so it will force GTK theme by default
+export DE="LXDE"
+export XDG_CURRENT_DESKTOP="$DE"
+export WINDOW_MANAGER="awesome"
+export VISUAL="wezterm start nvim"
+export BROWSER="chromium"
+export SDL_VIDEO_FULLSCREEN_DISPLAY=0
