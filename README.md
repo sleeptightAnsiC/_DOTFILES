@@ -18,7 +18,7 @@ they're not meant to be easy to understand for everyone, but instead easy to edi
 ### 2. multiple virtual machines for messing around and testing my deadly C code :)
 ![image](https://github.com/user-attachments/assets/05dc9231-1fca-4dd5-b930-bb1343435a00)
 
-### 3. unified look acroos multiple UI toolkits
+### 3. unified look across multiple UI toolkits
 ![image](https://github.com/user-attachments/assets/7b7ed7be-1534-47ec-8177-a57f559f8e77)
 
 ### 4. idk what, some TUI brainrot...
